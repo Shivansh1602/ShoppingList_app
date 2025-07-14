@@ -1,7 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:shopping_list_app/data/categories.dart';
 import 'package:shopping_list_app/models/category_model.dart';
 import 'package:shopping_list_app/models/grocery_item_model.dart';
+import 'package:http/http.dart'
+    as http; // basically as stores the bundle of package in an object ,name of our choice here which is given http it can be given any name
 
 class NewItem extends StatefulWidget {
   const NewItem({super.key});
@@ -12,21 +16,41 @@ class NewItem extends StatefulWidget {
 }
 
 class _NewItem extends State<NewItem> {
-  final formKey=GlobalKey<FormState>();
-  var enteredName='';
+  final formKey = GlobalKey<FormState>();
+  var enteredName = '';
   var enteredQuantity;
 
-  var _selectedCategory=categories[Categories.vegetables]!;
+  var _selectedCategory = categories[Categories.vegetables]!;
 
- void _saveItem(){  //validate is a method provided by the form widget which automtically which reach outs to all the form widgets inside of the form and executes its validator functions 
- if(formKey.currentState!.validate()){// as validate returns bool value we can pass it in if else condition and check if validations are correect only then the data will be saved   
-  formKey.currentState!.save();
-  Navigator.of(context).pop(GroceryItem(id: DateTime.now.toString(), name: enteredName, quantity: enteredQuantity, category: _selectedCategory));
+  void _saveItem() {
+    //validate is a method provided by the form widget which automtically which reach outs to all the form widgets inside of the form and executes its validator functions
+    if (formKey.currentState!.validate()) {
+      // as validate returns bool value we can pass it in if else condition and check if validations are correect only then the data will be saved
+      formKey.currentState!.save();
+      final url = Uri.https(
+        'flutter-prep-5fe04-default-rtdb.firebaseio.com',
+        'shopping_list_app.json',
+      );
+      http.post(
+        url,
+        headers: {'Content-type': 'application/json'},
+        body: json.encode({
+          'name': enteredName,
+          'quantity': enteredQuantity,
+          'category': _selectedCategory.title,// using only title to use it later as identifier for category ,
+        },
+      ),
+    );
+      // Navigator.of(context).pop(
+      //   GroceryItem(
+      //     id: DateTime.now.toString(),
+      //     name: enteredName,
+      //     quantity: enteredQuantity,
+      //     category: _selectedCategory,
+      //   ),
+      // );
+    }
   }
-  
- }
- 
-
 
   @override
   Widget build(BuildContext context) {
@@ -35,7 +59,7 @@ class _NewItem extends State<NewItem> {
       body: Padding(
         padding: const EdgeInsets.all(12),
         child: Form(
-          key:formKey ,
+          key: formKey,
           child: Column(
             children: [
               TextFormField(
@@ -50,8 +74,8 @@ class _NewItem extends State<NewItem> {
                   }
                   return null;
                 },
-                onSaved: (value){
-                  enteredName=value!;
+                onSaved: (value) {
+                  enteredName = value!;
                 },
               ), // instead of textfield() widget while dealing with forms
               Row(
@@ -70,8 +94,8 @@ class _NewItem extends State<NewItem> {
                         }
                         return null;
                       },
-                      onSaved: (value){
-                        enteredQuantity=int.parse(value!);
+                      onSaved: (value) {
+                        enteredQuantity = int.parse(value!);
                       },
                     ),
                   ),
@@ -79,7 +103,7 @@ class _NewItem extends State<NewItem> {
                   Expanded(
                     child: DropdownButtonFormField(
                       value: _selectedCategory,
-                   
+
                       items: [
                         for (final category
                             in categories
@@ -101,9 +125,8 @@ class _NewItem extends State<NewItem> {
                       ],
                       onChanged: (value) {
                         setState(() {
-                          _selectedCategory=value!;
+                          _selectedCategory = value!;
                         });
-                        
                       },
                     ),
                   ),
@@ -113,13 +136,17 @@ class _NewItem extends State<NewItem> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  ElevatedButton(onPressed: () {
-                    formKey.currentState!.reset();
-                  }, 
-                  child: Text('Reset')),
+                  ElevatedButton(
+                    onPressed: () {
+                      formKey.currentState!.reset();
+                    },
+                    child: Text('Reset'),
+                  ),
                   SizedBox(width: 5),
-                  ElevatedButton(onPressed: _saveItem,
-                   child: Text('Add Items')),
+                  ElevatedButton(
+                    onPressed: _saveItem,
+                    child: Text('Add Items'),
+                  ),
                 ],
               ),
             ],
