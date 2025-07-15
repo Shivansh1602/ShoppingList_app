@@ -1,61 +1,65 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:shopping_list_app/data/categories.dart';
 import 'package:shopping_list_app/models/category_model.dart';
 import 'package:shopping_list_app/models/grocery_item_model.dart';
-import 'package:http/http.dart'
-    as http; // basically as stores the bundle of package in an object ,name of our choice here which is given http it can be given any name
+import 'package:http/http.dart' as http;
 
 class NewItem extends StatefulWidget {
   const NewItem({super.key});
+
   @override
-  State<NewItem> createState() {
-    return _NewItem();
-  }
+  State<NewItem> createState() => _NewItem();
 }
 
 class _NewItem extends State<NewItem> {
   final formKey = GlobalKey<FormState>();
   var enteredName = '';
-  var enteredQuantity;
-
+  int? enteredQuantity;
   var _selectedCategory = categories[Categories.vegetables]!;
+  var _isSending = false;
 
-  void _saveItem() {
-    //validate is a method provided by the form widget which automtically which reach outs to all the form widgets inside of the form and executes its validator functions
+  void _saveItem() async {
     if (formKey.currentState!.validate()) {
-      // as validate returns bool value we can pass it in if else condition and check if validations are correect only then the data will be saved
       formKey.currentState!.save();
+      setState(() {
+        _isSending = true;
+      });
+
       final url = Uri.https(
         'flutter-prep-5fe04-default-rtdb.firebaseio.com',
         'shopping_list_app.json',
       );
-      http.post(
+
+      final response = await http.post(
         url,
         headers: {'Content-type': 'application/json'},
         body: json.encode({
           'name': enteredName,
           'quantity': enteredQuantity,
-          'category': _selectedCategory.title,// using only title to use it later as identifier for category ,
-        },
-      ),
-    );
-      // Navigator.of(context).pop(
-      //   GroceryItem(
-      //     id: DateTime.now.toString(),
-      //     name: enteredName,
-      //     quantity: enteredQuantity,
-      //     category: _selectedCategory,
-      //   ),
-      // );
+          'category': _selectedCategory.title,
+        }),
+      );
+
+      final Map<String, dynamic> resData = json.decode(response.body);
+
+      if (!context.mounted) return;
+
+      Navigator.of(context).pop(
+        GroceryItem(
+          id: resData['name'],
+          name: enteredName,
+          quantity: enteredQuantity!,
+          category: _selectedCategory,
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Add new item")),
+      appBar: AppBar(title: const Text("Add new item")),
       body: Padding(
         padding: const EdgeInsets.all(12),
         child: Form(
@@ -64,7 +68,7 @@ class _NewItem extends State<NewItem> {
             children: [
               TextFormField(
                 maxLength: 50,
-                decoration: InputDecoration(label: Text('Name')),
+                decoration: const InputDecoration(labelText: 'Name'),
                 validator: (value) {
                   if (value == null ||
                       value.isEmpty ||
@@ -77,20 +81,21 @@ class _NewItem extends State<NewItem> {
                 onSaved: (value) {
                   enteredName = value!;
                 },
-              ), // instead of textfield() widget while dealing with forms
+              ),
               Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
                     child: TextFormField(
                       keyboardType: TextInputType.number,
-                      decoration: InputDecoration(label: Text('Quantity')),
+                      decoration:
+                          const InputDecoration(labelText: 'Quantity'),
                       validator: (value) {
                         if (value == null ||
                             value.isEmpty ||
                             int.tryParse(value) == null ||
                             int.tryParse(value)! <= 0) {
-                          return 'Must be a valid, positive number';
+                          return 'Enter a valid positive no.';
                         }
                         return null;
                       },
@@ -99,30 +104,28 @@ class _NewItem extends State<NewItem> {
                       },
                     ),
                   ),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 12),
                   Expanded(
-                    child: DropdownButtonFormField(
+                    child: DropdownButtonFormField<Category>(
                       value: _selectedCategory,
-
-                      items: [
-                        for (final category
-                            in categories
-                                .entries) //.entries is used to treat a map like a list
-                          DropdownMenuItem(
-                            value: category.value,
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 16,
-                                  height: 16,
-                                  color: category.value.color,
-                                ),
-                                SizedBox(width: 6),
-                                Text(category.value.title),
-                              ],
-                            ),
+                      decoration:
+                          const InputDecoration(labelText: 'Category'),
+                      items: categories.entries.map((entry) {
+                        return DropdownMenuItem(
+                          value: entry.value,
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 16,
+                                height: 16,
+                                color: entry.value.color,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(entry.value.title),
+                            ],
                           ),
-                      ],
+                        );
+                      }).toList(),
                       onChanged: (value) {
                         setState(() {
                           _selectedCategory = value!;
@@ -137,15 +140,23 @@ class _NewItem extends State<NewItem> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   ElevatedButton(
-                    onPressed: () {
-                      formKey.currentState!.reset();
-                    },
-                    child: Text('Reset'),
+                    onPressed: _isSending
+                        ? null
+                        : () {
+                            formKey.currentState!.reset();
+                          },
+                    child: const Text('Reset'),
                   ),
-                  SizedBox(width: 5),
+                  const SizedBox(width: 5),
                   ElevatedButton(
-                    onPressed: _saveItem,
-                    child: Text('Add Items'),
+                    onPressed: _isSending ? null : _saveItem,
+                    child: _isSending
+                        ? const SizedBox(
+                            height: 16,
+                            width: 16,
+                            child: CircularProgressIndicator(),
+                          )
+                        : const Text('Add Items'),
                   ),
                 ],
               ),
